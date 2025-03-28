@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useHabits } from "../api/hooks/useHabits";
 import { Button } from "../components/ui/button";
@@ -10,7 +10,7 @@ import {
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useToast } from "../hooks/use-toast";
-import { HabitColor, HabitType } from "../api/types/appTypes";
+import { HabitColor, HabitType, ColorScheme } from "../api/types/appTypes";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { ColorPicker } from "../components/color-picker";
 import moment from "moment";
@@ -28,17 +28,18 @@ const getRandomColor = () => {
 function PreviewHeatmap({ 
   type, 
   color, 
-  targetCounter, 
-  startDay 
+  startDay,
+  name,
+  metric,
+  mockHabit
 }: { 
   type: HabitType; 
   color: HabitColor; 
-  targetCounter: number; 
-  startDay: "Monday" | "Sunday"; 
+  startDay: "Monday" | "Sunday";
+  name: string;
+  metric?: string;
+  mockHabit: any; // 模拟数据从外部传入
 }) {
-  // 使用样本数据生成器创建模拟习惯数据
-  const mockHabit = createMockHabit(type, color, targetCounter || 1);
-
   // 使用不同的元素包装热力图，避免ID冲突
   return (
     <div className="preview-heatmap-wrapper">
@@ -48,7 +49,7 @@ function PreviewHeatmap({
             habit={mockHabit} 
             startDay={startDay} 
             containerId="preview-boolean-heatmap" 
-            filterYear="Past 365d"
+            filterYear="Past year"
           />
         </div>
       ) : (
@@ -57,7 +58,7 @@ function PreviewHeatmap({
             habit={mockHabit} 
             startDay={startDay} 
             containerId="preview-counter-heatmap" 
-            filterYear="Past 365d"
+            filterYear="Past year"
           />
         </div>
       )}
@@ -68,14 +69,76 @@ function PreviewHeatmap({
 export function NewHabit() {
   const [name, setName] = useState("");
   const [color, setColor] = useState<HabitColor>(getRandomColor());
+  const [colorScheme, setColorScheme] = useState<ColorScheme | undefined>(undefined);
   const [type, setType] = useState<HabitType>(HabitType.BOOLEAN);
-  const [targetCounter, setTargetCounter] = useState<number>(1);
+  const [targetCounter, setTargetCounter] = useState<number>(10);
+  const [recordOnly, setRecordOnly] = useState<boolean>(false);
   const [metric, setMetric] = useState<string>("");
   const [startDay, setStartDay] = useState<"Monday" | "Sunday">("Sunday");
   const [isLoading, setIsLoading] = useState(false);
   const { createHabit } = useHabits();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // 当切换"仅记录"选项时，更新 targetCounter
+  useEffect(() => {
+    if (recordOnly) {
+      setTargetCounter(0);
+    } else if (targetCounter === 0) {
+      setTargetCounter(10);
+    }
+  }, [recordOnly]);
+
+  // 仅在type、targetCounter、color或colorScheme变化时生成模拟数据
+  const mockHabit = useMemo(() => {
+    // 使用样本数据生成器创建模拟习惯数据
+    const habit = createMockHabit(
+      type, 
+      color, 
+      type === HabitType.COUNTER ? targetCounter : 1, 
+      colorScheme
+    );
+    
+    // 创建显示名称和描述
+    const displayName = name.trim() || "Habit Tracker";
+    let description = "";
+    
+    if (type === HabitType.BOOLEAN) {
+      description = "Daily completion tracking";
+    } else if (type === HabitType.COUNTER) {
+      if (recordOnly || targetCounter === 0) {
+        description = "";
+      } else {
+        description = `Target: ${targetCounter}${metric ? ` ${metric}` : ""} per day`;
+      }
+    }
+    
+    // 添加名称和描述到模拟习惯
+    habit.name = displayName;
+    (habit as any).description = description;
+    
+    return habit;
+  }, [type, targetCounter, color, colorScheme, recordOnly, metric]);
+  
+  // 更新其他属性，但不重新生成数据
+  const previewData = useMemo(() => {
+    const updatedHabit = { ...mockHabit };
+    updatedHabit.name = name.trim() || "Habit Tracker";
+    
+    let description = "";
+    if (type === HabitType.BOOLEAN) {
+      description = "Daily completion tracking";
+    } else if (type === HabitType.COUNTER) {
+      if (recordOnly || targetCounter === 0) {
+        description = "";
+      } else {
+        description = `Target: ${targetCounter}${metric ? ` ${metric}` : ""} per day`;
+      }
+    }
+    (updatedHabit as any).description = description;
+    
+    return updatedHabit;
+  }, [mockHabit, name, metric, type, targetCounter, recordOnly]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +152,7 @@ export function NewHabit() {
       return;
     }
 
-    if (type === HabitType.COUNTER && (!targetCounter || targetCounter <= 0)) {
+    if (type === HabitType.COUNTER && !recordOnly && (!targetCounter || targetCounter <= 0)) {
       toast({
         title: "Invalid target counter",
         description: "Please provide a target counter greater than 0 for counter type habits.",
@@ -101,11 +164,14 @@ export function NewHabit() {
     setIsLoading(true);
 
     try {
-      await createHabit(
+      const result = await createHabit(
         name,
         color,
         type,
-        type === HabitType.COUNTER ? targetCounter : undefined
+        type === HabitType.COUNTER ? (recordOnly ? 0 : targetCounter) : undefined,
+        colorScheme, // 传递配色方案
+        metric, // 传递度量单位
+        startDay // 传递周开始日
       );
       toast({
         title: "Habit created",
@@ -123,9 +189,24 @@ export function NewHabit() {
     }
   };
 
+  // 处理配色方案选择
+  const handleSchemeChange = (scheme: ColorScheme) => {
+    setColorScheme(scheme);
+    // 当选择了配色方案时，清除单色选择
+    // 这是可选的，取决于您希望如何处理两者之间的关系
+    // setColor(undefined);
+  };
+
+  // 处理单色选择
+  const handleColorChange = (selectedColor: HabitColor) => {
+    setColor(selectedColor);
+    // 当选择了单色时，清除配色方案
+    setColorScheme(undefined);
+  };
+
   return (
-    <div className="max-w-[1000px] mx-auto px-8 py-8">
-      <Card className="max-w-[1000px] mx-auto">
+    <div className="max-w-[1200px] mx-auto px-8 py-8">
+      <div className="max-w-[1100px] mx-auto">
         <h1 className="text-2xl font-bold mx-6 mt-6 mb-4">Track a new habit</h1>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6 text-left">
@@ -135,7 +216,7 @@ export function NewHabit() {
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Read for 10 minutes"
+                placeholder="e.g., Daily Reading Tracker"
                 disabled={isLoading}
                 required
               />
@@ -170,31 +251,54 @@ export function NewHabit() {
             </div>
 
             {type === HabitType.COUNTER && (
-              <div className="space-y-2">
-                <Label htmlFor="metric">Choose a metric, i.e. kilometer, minute, step:</Label>
-                <Input
-                  id="metric"
-                  value={metric}
-                  onChange={(e) => setMetric(e.target.value)}
-                  placeholder="e.g., kilometer, minute, step"
-                  disabled={isLoading}
-                />
-              </div>
-            )}
-
-            {type === HabitType.COUNTER && (
-              <div className="space-y-2">
-                <Label htmlFor="targetCounter">Target {metric ? metric : "number"}:</Label>
-                <Input
-                  id="targetCounter"
-                  type="number"
-                  min="1"
-                  value={targetCounter}
-                  onChange={(e) => setTargetCounter(parseInt(e.target.value))}
-                  placeholder={`e.g., 5 ${metric}`}
-                  disabled={isLoading}
-                  required
-                />
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="recordOnly" 
+                    checked={recordOnly}
+                    onChange={(e) => setRecordOnly(e.target.checked)}
+                    className="h-4 w-4 rounded-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <Label htmlFor="recordOnly" className="font-medium cursor-pointer">
+                    Record Only (No Target)
+                  </Label>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="targetCounter">Target number:</Label>
+                    <Input
+                      id="targetCounter"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={recordOnly ? 0 : targetCounter}
+                      onChange={(e) => setTargetCounter(parseFloat(e.target.value))}
+                      placeholder="e.g., 30"
+                      disabled={isLoading || recordOnly}
+                      required={!recordOnly}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {recordOnly 
+                        ? "Record only, no target" 
+                        : "Support decimal values, accurate to two decimal places"}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="metric">Metric unit:</Label>
+                    <Input
+                      id="metric"
+                      value={metric}
+                      onChange={(e) => setMetric(e.target.value)}
+                      placeholder="e.g., minutes"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional unit to track (km, minutes, etc.)
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -208,18 +312,20 @@ export function NewHabit() {
                   <SelectValue placeholder="Select a day" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Monday">Mondays</SelectItem>
-                  <SelectItem value="Sunday">Sundays</SelectItem>
+                  <SelectItem value="Monday">Monday</SelectItem>
+                  <SelectItem value="Sunday">Sunday</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Pick a color:</Label>
+              <Label>Pick a color or scheme:</Label>
               <div className="text-left">
                 <ColorPicker
                   value={color}
-                  onChange={(value: HabitColor) => setColor(value)}
+                  onChange={handleColorChange}
+                  onSchemeChange={handleSchemeChange}
+                  selectedScheme={colorScheme}
                   disabled={isLoading}
                 />
               </div>
@@ -231,28 +337,11 @@ export function NewHabit() {
                 <PreviewHeatmap 
                   type={type} 
                   color={color} 
-                  targetCounter={targetCounter} 
                   startDay={startDay as "Monday" | "Sunday"} 
+                  name={name}
+                  metric={metric}
+                  mockHabit={previewData}
                 />
-                <div className="mt-4 space-y-1 text-sm border rounded-md p-4">
-                  <div className="flex items-center">
-                    <span className="mr-2">Streak:</span>
-                    <span className="font-medium">1182 days</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="mr-2">Average:</span>
-                    <span className="font-medium">4.99</span>
-                  </div>
-                  <div className="flex items-center justify-between border-t pt-2 mt-2">
-                    <div>
-                      <span className="mr-2">Today:</span>
-                      <span className="font-medium">8.78</span>
-                    </div>
-                    <div className="text-muted-foreground">
-                      Your daily habit journal will appear here!
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </form>
@@ -262,12 +351,12 @@ export function NewHabit() {
             type="submit" 
             disabled={isLoading} 
             onClick={handleSubmit}
-            className="w-full sm:w-auto"
+            className="w-full rounded-sm sm:w-auto"
           >
             {isLoading ? "Creating..." : "Create Habit"}
           </Button>
         </CardFooter>
-      </Card>
+      </div>
     </div>
   );
 }

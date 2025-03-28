@@ -8,7 +8,7 @@ import {
   HabitStatsOutput,
   Habit,
 } from "../generated";
-import { HabitColor, HabitType } from "../types/appTypes";
+import { HabitColor, HabitType, ColorScheme, ExtendedHabit } from "../types/appTypes";
 import { useCallback } from "react";
 
 export function useHabits() {
@@ -40,14 +40,43 @@ export function useHabits() {
 
   // Get a single habit by ID
   const getHabitById = async (habitId: string): Promise<Habit> => {
-    if (!isAuthenticated || !accessToken) {
-      throw new Error("Not authenticated");
+    try {
+      const habit = await HabitsService.habitsControllerGetHabit({
+        id: habitId,
+      });
+      
+      // 获取习惯的扩展属性
+      const extendedHabit = habit as ExtendedHabit;
+      
+      try {
+        // 从localStorage获取colorScheme
+        const colorScheme = localStorage.getItem(`habit_${habitId}_colorScheme`);
+        if (colorScheme) {
+          extendedHabit.colorScheme = colorScheme as ColorScheme;
+        }
+        
+        // 从localStorage获取metric (针对counter类型)
+        if (habit.type === 'counter') {
+          const metric = localStorage.getItem(`habit_${habitId}_metric`);
+          if (metric) {
+            extendedHabit.metric = metric;
+          }
+        }
+        
+        // 从localStorage获取weekStart
+        const weekStart = localStorage.getItem(`habit_${habitId}_weekStart`);
+        if (weekStart && (weekStart === 'Monday' || weekStart === 'Sunday')) {
+          extendedHabit.weekStart = weekStart;
+        }
+      } catch (error) {
+        console.error("Error getting extended properties from localStorage:", error);
+      }
+      
+      return extendedHabit;
+    } catch (error) {
+      console.error("Error fetching habit:", error);
+      throw error;
     }
-
-    const habit = await HabitsService.habitsControllerGetHabit({
-      id: habitId,
-    });
-    return habit;
   };
 
   // Get stats for a habit
@@ -177,7 +206,10 @@ export function useHabits() {
     name: string,
     color?: string,
     type: string = "boolean",
-    targetCounter?: number
+    targetCounter?: number,
+    colorScheme?: ColorScheme,
+    metric?: string,
+    weekStart?: "Monday" | "Sunday"
   ) => {
     // Validate color is a valid HabitColor
     const validColor = (color as HabitColor) || undefined;
@@ -190,9 +222,31 @@ export function useHabits() {
       color: validColor,
       type: validType,
       targetCounter: validType === "counter" ? targetCounter : undefined,
+      // 后端API暂不支持以下字段
+      // metric: validType === "counter" ? metric : undefined,
+      // weekStart,
     };
 
     const habit = await createHabitMutation.mutateAsync(habitData);
+    
+    // 存储前端特有属性到localStorage
+    const habitId = habit._id;
+
+    // 存储colorScheme到本地
+    if (colorScheme) {
+      localStorage.setItem(`habit_${habitId}_colorScheme`, colorScheme);
+    }
+    
+    // 存储metric到本地
+    if (metric && validType === "counter") {
+      localStorage.setItem(`habit_${habitId}_metric`, metric);
+    }
+    
+    // 存储weekStart到本地
+    if (weekStart) {
+      localStorage.setItem(`habit_${habitId}_weekStart`, weekStart);
+    }
+    
     return habit;
   };
 
@@ -203,12 +257,37 @@ export function useHabits() {
       color?: string;
       targetCounter?: number;
       type?: string;
+      colorScheme?: ColorScheme | null;
+      metric?: string | null;
+      weekStart?: "Monday" | "Sunday";
     }
   ) => {
+    // 处理colorScheme (前端特有，API不支持)
+    if (data.colorScheme) {
+      localStorage.setItem(`habit_${habitId}_colorScheme`, data.colorScheme);
+    } else if (data.colorScheme === null) {
+      // 如果明确设置为null，则删除
+      localStorage.removeItem(`habit_${habitId}_colorScheme`);
+    }
+    
+    // 处理metric (前端特有，API不支持)
+    if (data.metric) {
+      localStorage.setItem(`habit_${habitId}_metric`, data.metric);
+    } else if (data.metric === null) {
+      localStorage.removeItem(`habit_${habitId}_metric`);
+    }
+    
+    // 处理weekStart (前端特有，API不支持)
+    if (data.weekStart) {
+      localStorage.setItem(`habit_${habitId}_weekStart`, data.weekStart);
+    }
+    
     // Only include properties that are in UpdateHabitDto
     const updateData: UpdateHabitDto = {
       name: data.name,
       color: data.color as HabitColor,
+      // API暂不支持以下字段
+      // targetCounter: data.targetCounter,
     };
 
     const habit = await updateHabitMutation.mutateAsync({

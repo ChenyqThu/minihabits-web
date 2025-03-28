@@ -74,6 +74,7 @@ export function Home() {
     color: HabitColor.BLUE,
     type: HabitType.COUNTER,
     targetCounter: 10,
+    metric: "glasses",
     completedDates: {
       "2024-12-31": 5,
       "2025-01-01": 2,

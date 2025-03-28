@@ -1,22 +1,24 @@
 import { Habit } from "../api/generated";
-import { HabitColor, HabitType } from "../api/types/appTypes";
+import { HabitColor, HabitType, ColorScheme, ExtendedHabit } from "../api/types/appTypes";
 
 /**
  * 生成从指定起始日期到当前日期的样本数据
  * @param type 习惯类型（boolean或counter）
  * @param startDate 起始日期，默认为2023年1月1日
  * @param endDate 结束日期，默认为当天
+ * @param targetCounter 目标计数（对于计数型习惯）
  * @returns 日期与完成情况的映射对象
  */
 export function generateSampleData(
   type: HabitType,
   startDate: string = "2023-01-01",
-  endDate: string = new Date().toISOString().split("T")[0]
+  endDate: string = new Date().toISOString().split("T")[0],
+  targetCounter: number = 10 // 添加目标计数参数
 ): Record<string, number> {
   const start = new Date(startDate);
   const end = new Date(endDate);
   const data: Record<string, number> = {};
-  
+  targetCounter += 5;
   const currentDate = new Date(start);
   while (currentDate <= end) {
     const dateString = currentDate.toISOString().split("T")[0];
@@ -53,25 +55,25 @@ export function generateSampleData(
       
       data[dateString] = Math.random() < completionProbability ? 1 : 0;
     } else if (type === HabitType.COUNTER) {
-      // 计数类型数据生成
+      // 计数类型数据生成 - 使用目标计数作为上限
       let baseValue: number;
       
       // 工作日（1-5）通常计数较高
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        baseValue = Math.floor(Math.random() * 6) + 5; // 5-10
+        baseValue = Math.floor(Math.random() * (targetCounter * 0.6)) + (targetCounter * 0.4); // 40%-100%的目标值
       } else {
         // 周末计数较低
-        baseValue = Math.floor(Math.random() * 5); // 0-4
+        baseValue = Math.floor(Math.random() * (targetCounter * 0.5)); // 0-50%的目标值
       }
       
       // 夏季（6-8月）计数会略高
       if (month >= 5 && month <= 7) {
-        baseValue = Math.min(10, baseValue + 2);
+        baseValue = Math.min(targetCounter, baseValue + Math.floor(targetCounter * 0.2));
       }
       
       // 偶尔的"完美日"
       if (Math.random() < 0.1) {
-        baseValue = 10;
+        baseValue = targetCounter;
       }
       
       // 偶尔的"失败日"
@@ -96,7 +98,7 @@ export function generateSampleData(
       const streakLength = Math.floor(Math.random() * maxStreakLength) + 2;
       const streakValue = type === HabitType.BOOLEAN ? 
         (Math.random() > 0.7 ? 1 : 0) : 
-        Math.floor(Math.random() * 11);
+        Math.floor(Math.random() * (targetCounter + 1)); // 对于计数类型，使用目标值作为上限
       
       for (let j = 0; j < streakLength && i + j < dateKeys.length; j++) {
         data[dateKeys[i + j]] = streakValue;
@@ -114,23 +116,32 @@ export function generateSampleData(
  * @param type 习惯类型
  * @param color 习惯颜色
  * @param targetCounter 目标计数（对于计数型习惯）
+ * @param colorScheme 可选的颜色方案
  * @returns 模拟的习惯对象
  */
 export function createMockHabit(
   type: HabitType,
   color: HabitColor,
-  targetCounter: number = 1
-): Habit {
-  return {
+  targetCounter: number = 1,
+  colorScheme?: ColorScheme
+): ExtendedHabit {
+  const habit: ExtendedHabit = {
     _id: type === HabitType.BOOLEAN ? "preview-boolean-habit" : "preview-counter-habit",
     name: "Preview Habit",
     type: type,
     color: color,
     targetCounter: targetCounter,
-    completedDates: generateSampleData(type),
+    completedDates: generateSampleData(type, undefined, undefined, targetCounter),
     createdAt: new Date().toISOString(),
     userId: "preview-user",
     currentStreak: 14,
     longestStreak: 20
-  } as Habit;
+  };
+
+  // 如果提供了颜色方案，则添加到扩展属性中
+  if (colorScheme) {
+    habit.colorScheme = colorScheme;
+  }
+
+  return habit;
 } 

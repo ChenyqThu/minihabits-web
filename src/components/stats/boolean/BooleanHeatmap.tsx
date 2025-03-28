@@ -16,16 +16,11 @@ import CalHeatmap from "cal-heatmap";
 import { useEffect, useRef, useState } from "react";
 import { Habit } from "@/api/generated";
 import { useTheme } from "@/components/theme-provider";
-import { CalendarIcon } from "lucide-react";
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import { YearFilter } from "@/components/stats/YearFilter";
+import { ExtendedHabit, ColorScheme } from "@/api/types/appTypes";
 
 interface BooleanHeatmapProps {
-  readonly habit: Habit;
+  readonly habit: Habit | ExtendedHabit;
   readonly startDay?: "Monday" | "Sunday";
   readonly containerId?: string;
   readonly filterYear?: string;
@@ -35,7 +30,7 @@ export default function BooleanHeatmap({
   habit, 
   startDay = "Sunday", 
   containerId = "boolean-heatmap",
-  filterYear = "Past 365d"
+  filterYear = "Past year"
 }: BooleanHeatmapProps) {
   const { theme } = useTheme();
   const calRef = useRef<CalHeatmap | null>(null);
@@ -48,8 +43,8 @@ export default function BooleanHeatmap({
     if (!habit || !habit.completedDates) return;
     
     const years = new Set<string>();
-    // 添加"Past 365d"选项
-    years.add("Past 365d");
+    // 添加"Past year"选项
+    years.add("Past year");
     
     // 从数据中提取所有年份
     Object.keys(habit.completedDates).forEach(date => {
@@ -57,12 +52,12 @@ export default function BooleanHeatmap({
       years.add(year);
     });
     
-    // 转换为数组，降序排列，确保Past 365d在首位
+    // 转换为数组，降序排列，确保Past year在首位
     const sortedYears = Array.from(years)
-      .filter(year => year !== "Past 365d")
+      .filter(year => year !== "Past year")
       .sort((a, b) => parseInt(b) - parseInt(a));
     
-    setAvailableYears(["Past 365d", ...sortedYears]);
+    setAvailableYears(["Past year", ...sortedYears]);
   }, [habit?.completedDates]);
 
   useEffect(() => {
@@ -101,17 +96,41 @@ export default function BooleanHeatmap({
 
     // 根据选择的过滤年份设置日期范围
     let startDate;
-    if (selectedYear === "Past 365d") {
-      startDate = new Date(`2024-04-01`);
+    let monthRange=12;
+    if (selectedYear === "Past year") {
+      startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      monthRange = 13;
     } else {
       startDate = new Date(`${selectedYear}-01-01`);
+    }
+
+    // 配置颜色方案
+    const extendedHabit = habit as ExtendedHabit;
+    const colorScheme = extendedHabit.colorScheme;
+    let colorConfig: any;
+
+    if (colorScheme) {
+      // 使用配色方案
+      colorConfig = {
+        scheme: colorScheme,
+        type: "linear",
+        domain: [0, 1]
+      };
+    } else {
+      // 使用自定义颜色
+      colorConfig = {
+        range: [theme === "dark" ? "#161b22" : "#EDEDED", habit.color],
+        interpolate: "hsl",
+        type: "linear",
+        domain: [0, 1],
+      };
     }
 
     cal.paint(
       {
         itemSelector: containerRef.current,
         data: { source: data, x: "date", y: "value" },
-        range: 12,
+        range: monthRange,
         date: {
           start: startDate,
           // 禁用动画
@@ -123,24 +142,20 @@ export default function BooleanHeatmap({
         domain: {
           type: "month",
           sort: "asc",
+          gutter: -13,
           label: { text: "MMM", textAlign: "start", position: "top" },
         },
         subDomain: {
           type: "day",
           radius: 2,
-          width: 12,
-          height: 12,
+          width: 13,
+          height: 13,
           gutter: 4,
           // 正确处理日期排序，确保周开始日的正确设置
           sort: "asc"
         },
         scale: {
-          color: {
-            range: [theme === "dark" ? "#161b22" : "#EDEDED", habit.color],
-            interpolate: "hsl",
-            type: "linear",
-            domain: [0, 1],
-          },
+          color: colorConfig,
         },
         animationDuration: 0, // 禁用动画
       },
@@ -167,7 +182,16 @@ export default function BooleanHeatmap({
               const days = moment.weekdaysShort();
               // 根据起始日重新排序
               const reorderedDays = [...days.slice(weekStart), ...days.slice(0, weekStart)];
-              return reorderedDays.map((d, i) => (i % 2 == 0 ? "" : d));
+              // 固定显示周一、周三、周五
+              return reorderedDays.map((d, i) => {
+                // 找出对应于周一、周三、周五的索引位置
+                const mondayIndex = weekStart === 1 ? 0 : 1;
+                const wednesdayIndex = weekStart === 1 ? 2 : 3;
+                const fridayIndex = weekStart === 1 ? 4 : 5;
+                
+                // 只在周一、周三、周五的位置显示文本
+                return i === mondayIndex || i === wednesdayIndex || i === fridayIndex ? d : "";
+              });
             },
             padding: [25, 0, 0, 0],
           },
@@ -183,46 +207,20 @@ export default function BooleanHeatmap({
     };
   }, [habit?.completedDates, habit, theme, startDay, containerId, selectedYear]);
 
-  // 处理年份选择
-  const handleYearSelect = (year: string) => {
-    setSelectedYear(year);
-  };
-
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Yearly Heatmap</CardTitle>
+          <CardTitle>{habit.name || "Yearly Heatmap"}</CardTitle>
           <CardDescription>
-            Your habit completion throughout the year
+            {(habit as any).description || "Your habit completion throughout the year"}
           </CardDescription>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="icon" className="h-8 w-8 text-gray-500">
-              <CalendarIcon className="h-4 w-4" />
-              <span className="sr-only">Filter by year</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <div className="flex flex-col p-2 space-y-1">
-              <div className="px-2 py-1.5 text-sm font-medium text-gray-500 border-b">Filter by year</div>
-              {availableYears.map(year => (
-                <Button
-                  key={year}
-                  variant={selectedYear === year ? "default" : "ghost"}
-                  className="justify-start"
-                  onClick={() => handleYearSelect(year)}
-                >
-                  {selectedYear === year && (
-                    <div className="h-2 w-2 rounded-full bg-green-500 mr-2" />
-                  )}
-                  {year}
-                </Button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+        <YearFilter 
+          availableYears={availableYears}
+          selectedYear={selectedYear}
+          onYearSelect={setSelectedYear}
+        />
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <div ref={containerRef} id={containerId} className="w-full flex justify-center"></div>

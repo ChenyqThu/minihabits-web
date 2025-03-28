@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -33,7 +35,7 @@
 }
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Manrope, system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -111,8 +113,6 @@
     @apply bg-background text-foreground;
   }
 }
-
-
 
 @layer base {
   * {
