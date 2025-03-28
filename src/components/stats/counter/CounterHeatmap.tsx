@@ -98,34 +98,27 @@ export default function CounterHeatmap({
 
     // 根据每周开始日期设置
     const weekStart = startDay === "Monday" ? 1 : 0;
-    moment.updateLocale('en', { 
-      week: { 
-        dow: weekStart,  // 设置每周开始日
-        doy: 7 + weekStart // 确保年份的第一周正确计算
-      } 
-    });
 
     // 根据选择的过滤年份设置日期范围
-    let startDate, endDate;
+    let startDate;
     if (selectedYear === "Past 365d") {
-      endDate = moment().toDate();
-      startDate = moment().subtract(365, 'days').toDate();
+      startDate = moment().subtract(365, 'days').startOf('day').toDate();
     } else {
-      startDate = moment(`${selectedYear}-01-01`).toDate();
-      endDate = moment(`${selectedYear}-12-31`).toDate();
+      // 确保显示的是用户选择的年份，不要用startOf('year')来避免时区问题
+      startDate = new Date(`${selectedYear}-01-01T00:00:00`);
     }
 
     cal.paint(
       {
         itemSelector: containerRef.current,
         data: { source: data, x: "date", y: "value", groupBy: "max" },
+        range: 12,
         date: {
           start: startDate,
-          end: endDate,
           // 禁用动画
           highlight: 'none',
           locale: {
-            firstWeekday: weekStart // 明确设置每周的第一天
+            weekStart: weekStart // 明确设置每周的第一天
           }
         },
         domain: {
@@ -134,16 +127,13 @@ export default function CounterHeatmap({
           label: { text: "MMM", textAlign: "start", position: "top" },
         },
         subDomain: {
-          type: "ghDay",
+          type: "day",
           radius: 2,
           width: 12,
           height: 12,
           gutter: 4,
           // 正确处理日期排序，确保周开始日的正确设置
-          sort: "asc",
-          shift: {
-            day: weekStart // 明确设置周开始日
-          }
+          sort: "asc"
         },
         scale: {
           color: {
