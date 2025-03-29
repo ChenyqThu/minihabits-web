@@ -112,7 +112,7 @@ export function NewHabit() {
       if (recordOnly || targetCounter === 0) {
         description = "";
       } else {
-        description = `Target: ${targetCounter}${metric ? ` ${metric}` : ""} per day`;
+        description = `Goal: ${targetCounter}${metric ? ` ${metric}` : ""} per day`;
       }
     }
     
@@ -135,7 +135,7 @@ export function NewHabit() {
       if (recordOnly || targetCounter === 0) {
         description = "";
       } else {
-        description = `Target: ${targetCounter}${metric ? ` ${metric}` : ""} per day`;
+        description = `Goal: ${targetCounter}${metric ? ` ${metric}` : ""} per day`;
       }
     }
     (updatedHabit as any).description = description;
@@ -223,23 +223,23 @@ export function NewHabit() {
   return (
     <div className="max-w-[1100px] mx-auto px-8 py-8">
       <div className="max-w-[1050px] mx-auto">
-        <h1 className="text-2xl font-bold mx-6 mt-6 mb-4">Track a new habit</h1>
+        <h1 className="text-2xl font-bold mx-6 mt-6 mb-4">Start Your Habit Journey</h1>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6 text-left">
             <div className="space-y-2">
-              <Label htmlFor="name">Enter a title for your habit:</Label>
+              <Label htmlFor="name">Name Your Habit:</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Daily Reading Tracker"
+                placeholder="e.g., Morning Run, Reading, Meditation..."
                 disabled={isLoading}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Choose a type:</Label>
+              <Label>Select Tracking Method:</Label>
               <RadioGroup
                 value={type}
                 onValueChange={(value: HabitType) => setType(value)}
@@ -248,19 +248,19 @@ export function NewHabit() {
                 <div className="border rounded-md p-4 text-left">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value={HabitType.BOOLEAN} id="boolean" />
-                    <Label htmlFor="boolean" className="font-medium">Check</Label>
+                    <Label htmlFor="boolean" className="font-medium">Simple Check-in</Label>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Simple completion tracking - did you do it or not?
+                    Just mark complete or skip - easy tracking
                   </p>
                 </div>
                 <div className="border rounded-md p-4 text-left">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value={HabitType.COUNTER} id="counter" />
-                    <Label htmlFor="counter" className="font-medium">Number</Label>
+                    <Label htmlFor="counter" className="font-medium">Count & Measure</Label>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Track specific quantities like distance, time, or repetitions
+                    Track amounts, durations, or frequency. 
                   </p>
                 </div>
               </RadioGroup>
@@ -270,7 +270,7 @@ export function NewHabit() {
               <div className="space-y-4">                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="targetCounter">Target number:</Label>
+                    <Label htmlFor="targetCounter">Daily Goal:</Label>
                     <Input
                       id="targetCounter"
                       type="number"
@@ -290,21 +290,21 @@ export function NewHabit() {
                         disabled={isLoading}
                       />
                       <Label htmlFor="recordOnly" className="text-xs cursor-pointer">
-                        Record Only (No Target)
+                        Track Without a Goal
                       </Label>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="metric">Metric unit:</Label>
+                    <Label htmlFor="metric">Unit of Measure:</Label>
                     <Input
                       id="metric"
                       value={metric}
                       onChange={(e) => setMetric(e.target.value)}
-                      placeholder="e.g., minutes"
+                      placeholder="e.g., minutes, miles, cups, pages..."
                       disabled={isLoading}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Optional unit to track (km, minutes, etc.)
+                      Add your unit (miles, minutes, pages, etc.)
                     </p>
                   </div>
                 </div>
@@ -312,7 +312,7 @@ export function NewHabit() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="startDay">Pick a day to start your week:</Label>
+              <Label htmlFor="startDay">Week Starts On:</Label>
               <Select
                 value={startDay}
                 onValueChange={(value: "Monday" | "Sunday") => setStartDay(value)}
@@ -328,7 +328,7 @@ export function NewHabit() {
             </div>
 
             <div className="space-y-2">
-              <Label>Pick a color or scheme:</Label>
+              <Label>Choose Habit Color:</Label>
               <div className="text-left">
                 <ColorPicker
                   value={color}
@@ -341,7 +341,7 @@ export function NewHabit() {
             </div>
 
             <div className="space-y-2">
-              <Label>Preview</Label>
+              <Label>Preview Your Habit Calendar:</Label>
               <div className="rounded-md text-left">
                 {previewComponent}
               </div>
