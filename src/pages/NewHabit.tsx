@@ -207,6 +207,19 @@ export function NewHabit() {
     setColorScheme(undefined);
   };
 
+  // 使用 useMemo 配合 key 属性来避免同时创建多个热力图组件
+  const previewComponent = useMemo(() => (
+    <PreviewHeatmap
+      key={`preview-${type}-${Date.now()}`}
+      type={type}
+      color={color}
+      startDay={startDay}
+      name={name}
+      metric={metric}
+      mockHabit={previewData}
+    />
+  ), [type, color, startDay, name, metric, previewData]);
+
   return (
     <div className="max-w-[1100px] mx-auto px-8 py-8">
       <div className="max-w-[1050px] mx-auto">
@@ -330,14 +343,7 @@ export function NewHabit() {
             <div className="space-y-2">
               <Label>Preview</Label>
               <div className="rounded-md text-left">
-                <PreviewHeatmap 
-                  type={type} 
-                  color={color} 
-                  startDay={startDay as "Monday" | "Sunday"} 
-                  name={name}
-                  metric={metric}
-                  mockHabit={previewData}
-                />
+                {previewComponent}
               </div>
             </div>
           </form>
