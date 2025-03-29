@@ -123,7 +123,8 @@ export function createMockHabit(
   type: HabitType,
   color: HabitColor,
   targetCounter: number = 1,
-  colorScheme?: ColorScheme
+  colorScheme?: ColorScheme,
+  metric?: string
 ): ExtendedHabit {
   const habit: ExtendedHabit = {
     _id: type === HabitType.BOOLEAN ? "preview-boolean-habit" : "preview-counter-habit",
@@ -141,6 +142,11 @@ export function createMockHabit(
   // 如果提供了颜色方案，则添加到扩展属性中
   if (colorScheme) {
     habit.colorScheme = colorScheme;
+  }
+  
+  // 如果提供了度量单位，则添加到扩展属性中
+  if (metric) {
+    habit.metric = metric;
   }
 
   return habit;

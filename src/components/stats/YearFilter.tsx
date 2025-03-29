@@ -16,7 +16,7 @@ export function YearFilter({ availableYears, selectedYear, onYearSelect }: YearF
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" className="h-8 text-muted-foreground flex items-center gap-1">
+        <Button variant="ghost" className="px-2 py-2 h-8 text-muted-foreground flex items-center gap-1">
           <span className="text-sm">{selectedYear}</span>
           <CalendarIcon className="h-4 w-4" />
           <span className="sr-only">Filter the year</span>

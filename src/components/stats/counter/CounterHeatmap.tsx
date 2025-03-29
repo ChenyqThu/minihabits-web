@@ -17,19 +17,23 @@ import { useEffect, useRef, useState } from "react";
 import { Habit } from "@/api/generated";
 import { getColorRange, HabitColor, ExtendedHabit, ColorScheme } from "@/api/types/appTypes";
 import { YearFilter } from "@/components/stats/YearFilter";
+import { start } from "repl";
+import { FontSizeIcon } from "@radix-ui/react-icons";
 
 interface CounterHeatmapProps {
   readonly habit: Habit | ExtendedHabit;
   readonly startDay?: "Monday" | "Sunday";
   readonly containerId?: string;
   readonly filterYear?: string;
+  readonly metric?: string;
 }
 
 export default function CounterHeatmap({ 
   habit, 
   startDay = "Sunday", 
   containerId = "counter-heatmap",
-  filterYear = "Past year"
+  filterYear = "Past year",
+  metric = ""
 }: CounterHeatmapProps) {
   const calRef = useRef<CalHeatmap | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,17 +49,14 @@ export default function CounterHeatmap({
       style.id = styleId;
       style.innerHTML = `
         #ch-tooltip {
-          padding: 5px 8px;
-          border-radius: 5px;
-          min-width: 80px;
-          max-width: 150px;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          font-size: 12px;
-          line-height: 1.4;
+          border-radius: 3px;
           text-align: left;
           color: black;
           background-color: #FFF;
+        }
+        
+        #ch-tooltip-arrow {
+          margin-left: 0px !important;
         }
         
         .dark #ch-tooltip {
@@ -63,18 +64,6 @@ export default function CounterHeatmap({
           background-color: #333;
           background-image: linear-gradient(to bottom, #333, #222);
           border-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        #ch-tooltip.yellow-tooltip {
-          background-color: #AAA;
-          background-image: linear-gradient(to bottom, #FFF8DC, #FFE87C);
-          border-color: #FFD700;
-        }
-        
-        #ch-tooltip.blue-tooltip {
-          background-color: #E6F2FF;
-          background-image: linear-gradient(to bottom, #E6F2FF, #B3D9FF);
-          border-color: #4D94FF;
         }
         
         #ch-tooltip .ch-tooltip-value {
@@ -138,6 +127,17 @@ export default function CounterHeatmap({
         
         .dark g:hover rect.ch-subdomain-bg {
           stroke: rgba(255, 255, 255, 0.7) !important;
+        }
+        
+        /* 防止文本被选中 */
+        .ch-plugin-calendar-label-text {
+          pointer-events: none;
+          user-select: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          font-size: 12px !important;
+          fill: var(--label) !important;
         }
       `;
       document.head.appendChild(style);
@@ -204,14 +204,13 @@ export default function CounterHeatmap({
 
     // 获取度量单位（如果有）
     const extendedHabit = habit as ExtendedHabit;
-    const metricUnit = extendedHabit.metric || '';
+    // const metricUnit = extendedHabit.metric || '';
 
     const getTooltipText = (
       timestamp: number,
       value: number | null,
       dayjsDate: { format: (format: string) => string }
     ) => {
-      if (value === null) return "No data";
       
       // 格式化日期为 "周几 月 日 年" 格式，例如 "Fri Aug 30 2024"
       const dateDisplay = dayjsDate.format("MMM D YYYY, ddd");
@@ -220,24 +219,24 @@ export default function CounterHeatmap({
       let messageDisplay = '';
       
       // 设置数值显示和信息文本
-      if (!habit.targetCounter || habit.targetCounter <= 0) {
+      if (value === null) {
+        valueDisplay = 'No data';
+      } else if (!habit.targetCounter || habit.targetCounter <= 0) {
         // 没有目标的情况
-        valueDisplay = `${value}${metricUnit ? ` ${metricUnit}` : ''}`;
-        messageDisplay = 'Your daily habit journal will appear here!';
+        valueDisplay = `${value}${metric ? ` ${metric}` : ''}`;
       } else {
         // 有目标的情况
         
         if (value >= habit.targetCounter) { 
           // 达成目标
-          valueDisplay = `✅ ${value} / ${habit.targetCounter} ${metricUnit ? ` ${metricUnit}` : ''}`;
+          valueDisplay = `✅ ${value} ${metric ? ` ${metric}` : ''}`;
         } else {
           // 未达成目标
-          valueDisplay = `💪 ${value} / ${habit.targetCounter} ${metricUnit ? ` ${metricUnit}` : ''}`;
+          valueDisplay = `💪 ${value} ${metric ? ` ${metric}` : ''}`;
         }
 
-        messageDisplay = 'your daily habit journal will appear here!';
       }
-      
+      messageDisplay = ' ';
       // 返回带有HTML格式的文本，模拟图片中的样式
       return `<div class="ch-tooltip-value">${valueDisplay}</div>
               <div class="ch-tooltip-date">${dateDisplay}</div>
@@ -249,10 +248,10 @@ export default function CounterHeatmap({
 
     // 根据选择的过滤年份设置日期范围
     let startDate;
-    let monthRange=12;
+    let range=1;
     if (selectedYear === "Past year") {
       startDate = moment().subtract(365, 'days').startOf('day').toDate();
-      monthRange = 13;
+      range = 2;
     } else {
       // 确保显示的是用户选择的年份，不要用startOf('year')来避免时区问题
       startDate = new Date(`${selectedYear}-01-01`);
@@ -306,79 +305,190 @@ export default function CounterHeatmap({
         return '';
       }
       
-      // 如果值达到或超过目标，显示✓
+      // 如果值达到或超过目标，显示线稿图案
       if (value >= habit.targetCounter!) {
-        // 可以设置标签样式
-        element.setAttribute('font-size', '12px');
-        element.setAttribute('style', 'fill: #fff;');
-        element.setAttribute('font-weight', 'bold');
-        element.setAttribute('text-anchor', 'middle');
-        element.setAttribute('dominant-baseline', 'middle');
-        return '✓';
+        // 设置标签样式
+        element.setAttribute('style', 'fill: hsl(var(--secondary)); font-size: 8px; pointer-events: none; user-select: none;');
+        //return '✦';
+        return '✦';
       }
       
       return '';
     };
 
-    // 设置tooltip主题类 - 根据habit颜色
-    const getTooltipTheme = (timestamp: number, value: number) => {
-      // 根据习惯颜色确定tooltip类
-      if (habit.color === HabitColor.YELLOW || 
-          habit.color === HabitColor.ORANGE) {
-        return 'yellow-tooltip';
-      } else if (habit.color === HabitColor.BLUE ||
-                habit.color === HabitColor.TEAL) {
-        return 'blue-tooltip';
-      }
-      return '';
-    };
+    // 添加自定义的 pastDay 模板，仅显示过去365天的数据
+    const pastDayTemplate = (DateHelper: any) => ({
+      name: 'pastDay',
+      parent: 'day',
+      rowsCount: () => 7, // 一周7天
+      
+      columnsCount: (ts: number) => {
+        // 获取当前处理的年份和当前年份
+        const year = moment(ts).year();
+        const currentYear = moment().year();
+        const pastYearStart = moment().subtract(365, 'days').startOf('day');
+        
+        // 根据处理的年份确定起始日和结束日
+        let startDay, endDay;
+        if (year === currentYear - 1) { // 去年
+          startDay = pastYearStart; // 过去365天的起始日
+          endDay = moment(pastYearStart).endOf('year'); // 去年年底
+        } else if (year === currentYear) { // 今年
+          startDay = moment(year, 'YYYY').startOf('year'); // 今年1月1日
+          endDay = moment(); // 今天
+        } else {
+          return 0; // 其他年份不处理
+        }
+        
+        // 计算从起始日到结束日的天数
+        const days = endDay.diff(startDay, 'days');
+        
+        // 调整起始日的星期几，考虑 weekStart
+        const startDayOfWeek = startDay.day() - weekStart < 0 ? 
+          startDay.day() + 6 : 
+          startDay.day() - weekStart;
+        
+        // 计算周数，加1确保有足够的空间
+        return Math.ceil((days + startDayOfWeek) / 7);
+      },
+      
+      mapping: (startTimestamp: number, endTimestamp: number) => {
+        // 获取当前处理的年份和当前年份
+        const year = moment(startTimestamp).year();
+        const currentYear = moment().year();
+        const pastYearStart = moment().subtract(365, 'days').startOf('day');
+        const today = moment().endOf('day');
+        
+        // 生成日期区间
+        return DateHelper.intervals(
+          'day',
+          startTimestamp,
+          DateHelper.date(endTimestamp)
+        )
+          .map((ts: number) => {
+            const date = moment(ts);
+            
+            // 只处理过去365天到今天范围内的日期
+            if (date.isBefore(pastYearStart) || date.isAfter(today)) {
+              return null;
+            }
+            
+            // 根据年份确定起始日
+            let startDay;
+            if (date.year() === currentYear - 1) { // 去年的日期
+              startDay = pastYearStart; // 从过去365天的起始日计算
+            } else if (date.year() === currentYear) { // 今年的日期
+              startDay = moment(date).startOf('year'); // 从今年1月1日计算
+            } else {
+              return null; // 其他年份不处理
+            }
+            
+            // 调整起始日的星期几，考虑 weekStart
+            const startDayOfWeek = startDay.day() - weekStart < 0 ? 
+              startDay.day() + 6 : 
+              startDay.day() - weekStart;
+            
+            // 计算与起始日的天数差
+            const dayDiff = date.diff(startDay, 'days');
+            
+            // 计算 x 坐标（列）
+            const x = Math.floor((dayDiff + startDayOfWeek) / 7);
+            
+            // 计算 y 坐标（行）- 周几，使用简化公式
+            const y = date.day() - weekStart < 0 ? 
+              date.day() + 6 : 
+              date.day() - weekStart;
+            
+            return {
+              t: ts,
+              x: x,
+              y: y,
+            };
+          })
+          .filter((n: any) => n !== null);
+      },
+    });
 
-    // 添加带有自定义数据属性的渲染函数，用于根据完成率设置边框样式
-    const renderSubDomainData = (element: SVGElement, timestamp: number, value: number | null) => {
-      if (value === null || !habit.targetCounter || habit.targetCounter <= 0) return;
+    // 添加自定义模板
+    cal.addTemplates(pastDayTemplate);
+
+    // 设置subdomain类型，根据是否是"Past year"来决定
+    const subDomainType = selectedYear === "Past year" ? "pastDay" : "day";
+
+    // 准备月份标签函数
+    const getMonthLabels = () => {
+      // 初始化结果数组，包含53列的空字符串
+      const result = Array(53).fill('');
       
-      const parent = element.parentNode as SVGElement;
-      if (!parent) return;
-      
-      // 计算完成率（大于100%按100%计算）
-      const completionRate = Math.min(value / habit.targetCounter, 1) * 100;
-      
-      // 根据完成率设置不同的数据属性
-      if (completionRate < 30) {
-        parent.setAttribute('data-completion', 'low');
-      } else if (completionRate < 70) {
-        parent.setAttribute('data-completion', 'medium');
-      } else if (completionRate < 100) {
-        parent.setAttribute('data-completion', 'high');
+      // 确定起始日期
+      let startDay;
+      if (selectedYear === "Past year") {
+        // Past year模式：从过去365天开始
+        startDay = moment().subtract(365, 'days');
       } else {
-        parent.setAttribute('data-completion', 'complete');
+        // 特定年份模式：从当年1月1日开始
+        startDay = moment(`${selectedYear}-01-01`);
       }
       
-      // 设置dash-array动画角度值，基于完成率
-      parent.style.setProperty('--completion-angle', `${completionRate * 3.6}deg`);
+      // 记录起始日期是星期几(0-6)，用于计算偏移量.考虑周开始日的情况，如果是周1开始，需要减去1，出现负数，则需要加7
+      const startDayOfWeek = startDay.day() - weekStart < 0 ? startDay.day() - weekStart + 7 : startDay.day() - weekStart;
+      
+      // 确定当前月份，如果startDay不是月初，需要先添加当月标签
+      let currentDate = startDay.clone();
+      let monthsAdded = 0;
+      const maxMonths = 12; // 最多添加12个月份标签
+      
+      // 如果startDay不是月初第一天，直接将其移动到下月第一天
+      if (startDay.date() !== 1) {
+        // 移动到下个月第一天
+        currentDate = startDay.clone().add(1, 'month').startOf('month');
+      }
+      else {
+        result[0] = startDay.format('MMM');
+        monthsAdded++;
+        currentDate = currentDate.add(1, 'month');
+      }
+      
+      // 从startDay或下个月初开始，逐月添加标签
+      while (monthsAdded < maxMonths) {
+        // 计算当前日期与起始日期相差天数
+        const daysDiff = currentDate.diff(startDay, 'days');
+        
+        // 计算对应的列位置 = (相差天数 + 起始日期的星期几) / 7
+        const columnPosition = Math.floor((daysDiff + startDayOfWeek) / 7);
+        
+        // 如果列位置在有效范围内，添加月份标签
+        if (columnPosition < 53 && columnPosition >= 0) {
+          result[columnPosition] = currentDate.format('MMM');
+          monthsAdded++;
+        }
+        
+        // 移动到下一个月第一天
+        currentDate = currentDate.add(1, 'month');
+      }
+      
+      return result;
     };
 
     cal.paint(
       {
         itemSelector: containerRef.current,
         data: { source: data, x: "date", y: "value", groupBy: "max" },
-        range: monthRange,
+        range: range,
         date: {
           start: startDate,
-          // 禁用动画
-          highlight: 'none',
           locale: {
             weekStart: weekStart // 明确设置每周的第一天
           }
         },
         domain: {
-          type: "month",
+          type: "year",
           sort: "asc",
           gutter: -13,
-          label: { text: "MMM", textAlign: "start", position: "top" },
+          label: { text: "" },
         },
         subDomain: {
-          type: "day",
+          type: subDomainType,
           radius: 2,
           width: 13,
           height: 13,
@@ -387,8 +497,6 @@ export default function CounterHeatmap({
           sort: "asc",
           // 使用label函数显示完成标记，替代自定义渲染器
           label: shouldShowCheckmarks ? labelFunction : null,
-          // 添加自定义数据渲染器
-          data: renderSubDomainData,
         },
         scale: {
           color: colorConfig,
@@ -402,7 +510,6 @@ export default function CounterHeatmap({
             text: getTooltipText,
             // popper.js 配置选项
             placement: 'top',
-            className: getTooltipTheme,
             modifiers: [
               {
                 name: 'offset',
@@ -416,8 +523,10 @@ export default function CounterHeatmap({
         [
           CalHeatmapLabel,
           {
-            width: 30,
-            textAlign: "start",
+            width: 25,
+            textAlign: "end",
+            position: "left",
+            key: "weekLabels",
             text: () => {
               const days = moment.weekdaysShort();
               // 根据起始日重新排序
@@ -433,19 +542,29 @@ export default function CounterHeatmap({
                 return i === mondayIndex || i === wednesdayIndex || i === fridayIndex ? d : "";
               });
             },
-            padding: [25, 0, 0, 0],
+            padding: [0, 8, 0, 0],
+          },
+        ],
+        [
+          CalHeatmapLabel,
+          {
+            key: "monthLabels", // 唯一键标识
+            position: "top",
+            textAlign: "start",
+            text: getMonthLabels,
+            padding: [0, 0, 8, 0],
           },
         ],
       ]
     );
-
+    
     return () => {
       if (calRef.current) {
         calRef.current.destroy();
         calRef.current = null;
       }
     };
-  }, [habit?.completedDates, habit?.targetCounter, habit?.color, startDay, containerId, selectedYear]);
+  }, [habit?.completedDates, habit?.targetCounter, habit?.color, startDay, containerId, selectedYear, metric]);
 
   return (
     <Card className="w-full">

@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import BooleanHeatmap from "../components/stats/boolean/BooleanHeatmap";
 import CounterHeatmap from "../components/stats/counter/CounterHeatmap";
 import { createMockHabit } from "../utils/sampleDataGenerator";
+import { Checkbox } from "../components/ui/checkbox";
 
 const getRandomColor = () => {
   const colors = Object.values(HabitColor);
@@ -59,6 +60,7 @@ function PreviewHeatmap({
             startDay={startDay} 
             containerId="preview-counter-heatmap" 
             filterYear="Past year"
+            metric={metric}
           />
         </div>
       )}
@@ -96,7 +98,8 @@ export function NewHabit() {
       type, 
       color, 
       type === HabitType.COUNTER ? targetCounter : 1, 
-      colorScheme
+      colorScheme,
+      metric // 传递度量单位
     );
     
     // 创建显示名称和描述
@@ -205,8 +208,8 @@ export function NewHabit() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-8 py-8">
-      <div className="max-w-[1100px] mx-auto">
+    <div className="max-w-[1100px] mx-auto px-8 py-8">
+      <div className="max-w-[1050px] mx-auto">
         <h1 className="text-2xl font-bold mx-6 mt-6 mb-4">Track a new habit</h1>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6 text-left">
@@ -251,20 +254,7 @@ export function NewHabit() {
             </div>
 
             {type === HabitType.COUNTER && (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    id="recordOnly" 
-                    checked={recordOnly}
-                    onChange={(e) => setRecordOnly(e.target.checked)}
-                    className="h-4 w-4 rounded-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <Label htmlFor="recordOnly" className="font-medium cursor-pointer">
-                    Record Only (No Target)
-                  </Label>
-                </div>
-                
+              <div className="space-y-4">                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="targetCounter">Target number:</Label>
@@ -279,11 +269,17 @@ export function NewHabit() {
                       disabled={isLoading || recordOnly}
                       required={!recordOnly}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      {recordOnly 
-                        ? "Record only, no target" 
-                        : "Support decimal values, accurate to two decimal places"}
-                    </p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Checkbox 
+                        id="recordOnly" 
+                        checked={recordOnly}
+                        onCheckedChange={(checked) => setRecordOnly(checked === true)}
+                        disabled={isLoading}
+                      />
+                      <Label htmlFor="recordOnly" className="text-xs cursor-pointer">
+                        Record Only (No Target)
+                      </Label>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="metric">Metric unit:</Label>
